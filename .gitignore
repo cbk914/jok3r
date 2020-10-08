@@ -8,6 +8,7 @@ __pycache__/
 *.egg
 build/
 dist/
+payload.out
 
 # Toolbox
 toolbox/*
@@ -37,3 +38,8 @@ knownbugs.txt
 .swp
 cpentest
 *sqlite
+Gor*
+hosts
+
+
+
