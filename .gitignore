@@ -8,6 +8,7 @@ __pycache__/
 *.egg
 build/
 dist/
+payload.out
 
 # Toolbox
 toolbox/*
@@ -30,3 +31,15 @@ apikeys.py
 
 # Junk files
 shodan
+pentest*
+kickoff*
+kick-off*
+knownbugs.txt
+.swp
+cpentest
+*sqlite
+Gor*
+hosts
+
+
+
