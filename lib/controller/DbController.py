@@ -74,7 +74,6 @@ class DbController(cmd2.Cmd):
             del cmd2.Cmd.do_shortcuts
         except:
             pass
-=======
         del cmd2.Cmd.do_edit
         #del cmd2.Cmd.do_load
         del cmd2.Cmd.do_py
