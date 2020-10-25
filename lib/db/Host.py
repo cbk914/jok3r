@@ -12,7 +12,7 @@ from sqlalchemy.ext.hybrid import hybrid_method
 from lib.db.IPAddressType import IPAddressType
 
 from lib.db.Service import Service, Protocol
-from lib.db.Session import Base
+from lib.db.Base import Base
 
 class Host(Base):
     __tablename__ = 'hosts'
@@ -121,6 +121,20 @@ class Host(Base):
 
 
     @hybrid_method
+    def get_nb_products(self):
+        """
+        Get total number of detected products for all services referenced for this host.
+        :return: Number of detected products
+        :rtype: int
+        """
+        nb = 0
+        for s in self.services:
+            nb += len(s.products)
+            
+        return nb
+
+
+    @hybrid_method
     def get_nb_vulns(self):
         """
         Get total number of vulnerabilities for all services referenced for this host.
@@ -132,6 +146,35 @@ class Host(Base):
             nb += len(s.vulns)
             
         return nb
+
+
+    #------------------------------------------------------------------------------------
+
+    @hybrid_method
+    def get_list_services(self):
+        """
+        Get list of services with basic information for this host. 
+
+        :return: List of services
+        :rtype: list({'id': int, port': int, 'protocol': str, 'name': str, 'url': str})
+        """
+        services = list()
+        for svc in self.services:
+            found = False
+            # for svc2 in services:
+            #     if svc.port == svc2['port']:
+            #         found = True
+            #         break
+            if not found:
+                services.append({
+                    'id': svc.id,
+                    'port': svc.port,
+                    'protocol': { Protocol.TCP: 'tcp', Protocol.UDP: 'udp' }.get(
+                        svc.protocol, 'tcp'),
+                    'name': svc.name,
+                    'url': svc.url,
+                })
+        return services
 
 
     #------------------------------------------------------------------------------------

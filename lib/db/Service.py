@@ -12,11 +12,13 @@ from sqlalchemy.ext.hybrid import hybrid_method
 
 from lib.core.Config import *
 from lib.db.Credential import Credential
+from lib.db.Job import Job
 from lib.db.Option import Option
 from lib.db.Product import Product
 from lib.db.Result import Result
+from lib.db.Screenshot import Screenshot
 from lib.db.Vuln import Vuln
-from lib.db.Session import Base
+from lib.db.Base import Base
 
 
 class Protocol(enum.Enum):
@@ -53,6 +55,8 @@ class Service(Base):
     results       = relationship('Result', order_by=Result.id, 
         back_populates='service', cascade='save-update, merge, delete, delete-orphan')
     vulns         = relationship('Vuln', order_by=Vuln.id, 
+        back_populates='service', cascade='save-update, merge, delete, delete-orphan')
+    jobs          = relationship('Job', order_by=Job.id, 
         back_populates='service', cascade='save-update, merge, delete, delete-orphan')
     screenshot    = relationship('Screenshot', uselist=False, 
         back_populates='service', cascade='save-update, merge, delete, delete-orphan')
@@ -145,13 +149,14 @@ class Service(Base):
         """
         Add product to the service.
         Make sure to not add twice the same product.
-        Update value if necessary
+        Update value if necessary.
+        Multiple products for a single product type are supported.
 
         :param Product product: Product object to add
         """
-        matching_product = self.get_product(product.type)
+        matching_product = self.get_product(product.type, product.name)
         if matching_product:
-            matching_product.name = product.name
+            #matching_product.name = product.name
             matching_product.version = product.version
         else:
             self.products.append(product)
@@ -179,6 +184,7 @@ class Service(Base):
     def get_option(self, name):
         """
         Get a specific option related to the service.
+
         :param str name: Option name to look for
         :return: Specific option
         :rtype: Option|None
@@ -190,29 +196,75 @@ class Service(Base):
 
 
     @hybrid_method
-    def get_product(self, product_type):
+    def get_options_no_encrypt(self):
         """
-        Get product corresponding to given product type.
+        Get all options related to the service, except options related to 
+        encryption (https, ftps...)
+
+        :return: List of Specific options
+        :rtype: list(Option)
+        """
+        res = list()
+        for opt in self.options:
+            if opt.name not in OPTIONS_ENCRYTPED_PROTO:
+                res.append(opt)
+        return res
+
+
+    @hybrid_method
+    def get_products(self, product_type):
+        """
+        Get list of products corresponding to given product type 
+        (case insensitive match).
+
         :param str product_type: Product type to look for
-        :return: Product
+        :return: List of Products
+        :rtype: list(Product)
+        """
+        list_products = list()
+        for prod in self.products:
+            if prod.type.lower() == product_type.lower():
+                list_products.append(prod)
+        return list_products
+
+
+    @hybrid_method
+    def get_product(self, product_type, product_name):
+        """
+        Get a product by type and name if existing (case insensitive match).
+
+        :param str product_type: Product type to look for
+        :param str product_name: Product name to look for
+        :return: Matching Product
         :rtype: Product|None
         """
         for prod in self.products:
-            if prod.type == product_type.lower():
+            if prod.type.lower() == product_type.lower() and \
+               prod.name.lower() == product_name.lower():
                 return prod
         return None
 
 
     @hybrid_method
-    def get_vuln(self, name):
+    def get_vuln(self, name, reference=None):
         """
-        Get vulnerability matching (exactly) given name.
+        Get vulnerability matching given name or reference.
+        IMPORTANT: Reference lookup works only for vulnerabilities with unique
+        reference identified (like CVE-***, MS*** but NOT CWE-*** OSVDB-***).
+
         :param str name: Name of vulnerability to look for
+        :param str reference: Reference of vulnerability to look for
         :return: Vulnerability
         :rtype: Vuln|None
         """
+        reference_id_uniques_prefix = ('CVE', 'MS')
         for vuln in self.vulns:
             if vuln.name.lower() == name.lower():
+                return vuln
+            if reference is not None and \
+               reference.lower().strip() in list(map(lambda x: x.lower(), 
+                   reference_id_uniques_prefix)) and \
+               vuln.reference.lower().strip() == reference.lower().strip():
                 return vuln
         return None
 
@@ -221,6 +273,7 @@ class Service(Base):
     def get_credential(self, username, auth_type=None):
         """
         Get credentials with given username.
+
         :param str username: Username to look for
         :param str auth_type: Authentication type (for HTTP service)
         :return: Credential
@@ -236,6 +289,7 @@ class Service(Base):
     def get_nb_credentials(self, single_username=False):
         """
         Get total number of credentials for the service.
+
         :param bool single_username: If True, get the number of single usernames 
             (password unknown). If False, get the number of username/password couples
         :return: Number of selected credentials
@@ -250,6 +304,34 @@ class Service(Base):
                 if cred.username is not None and cred.password is not None:
                     nb += 1
         return nb
+
+
+    @hybrid_method
+    def get_checks_categories(self):
+        """
+        Get list of categories of checks that have been partially or fully run for the
+        service.
+        Note: If only one single check in a category (e.g. recon) has been run for the
+        service, it is returned.
+
+        :return: List of categories of checks
+        :rtype: list({'name': str, 'count': int)
+        """
+        categories = list()
+        for res in self.results:
+            found = False
+            for cat in categories:
+                if res.category == cat['name']:
+                    cat['count'] += 1
+                    found = True
+                    break
+            if not found:
+                categories.append({
+                    'name': res.category,
+                    'count': 1,
+                })
+
+        return categories
 
 
     #------------------------------------------------------------------------------------

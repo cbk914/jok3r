@@ -248,6 +248,7 @@ python-nmap
 python3-pymysql
 python3-psycopg2
 python3-shodan
+python3-git
 "
 
 for package in $PACKAGES; do    
@@ -674,6 +675,23 @@ fi
 print_delimiter
 
 # -----------------------------------------------------------------------------
+# Install Go
+
+if ! [ -x "$(command -v go)" ]; then
+    print_blue "[~] Install Go"
+    apt-get install -y golang-go
+    if [ -x "$(command -v go)" ]; then
+        print_green "[+] Go installed successfully"
+    else
+        print_red "[!] An error occured during Go install"
+        exit 1
+    fi   
+else
+    print_green "[+] Go is already installed"
+fi
+print_delimiter
+
+# -----------------------------------------------------------------------------
 # Install Java
 
 if ! [ -x "$(command -v java)" ]; then
@@ -741,6 +759,38 @@ if ! [ -x "$(command -v geckodriver)" ]; then
     fi   
 else
     print_green "[+] Geckodriver is already installed"
+fi
+print_delimiter
+
+# -----------------------------------------------------------------------------
+# Install tmux
+if ! [ -x "$(command -v tmux)" ]; then
+    print_blue "[~] Install Tmux"
+    apt-get install -y tmux
+    if [ -x "$(command -v tmux)" ]; then
+        print_green "[+] Tmux installed successfully"
+    else
+        print_red "[!] An error occured during Tmux install"
+        exit 1
+    fi   
+else
+    print_green "[+] Tmux is already installed"
+fi
+print_delimiter
+
+# -----------------------------------------------------------------------------
+# Install Redis-server
+if ! [ -x "$(command -v redis-server)" ]; then
+    print_blue "[~] Install Redis-server"
+    apt-get install -y redis-server
+    if [ -x "$(command -v redis-server)" ]; then
+        print_green "[+] Redis-server installed successfully"
+    else
+        print_red "[!] An error occured during Redis-server install"
+        exit 1
+    fi   
+else
+    print_green "[+] Redis-server is already installed"
 fi
 print_delimiter
 

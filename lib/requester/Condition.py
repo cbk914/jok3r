@@ -44,6 +44,7 @@ class Condition:
         self.mapping = {
             FilterData.IP              : self.__translate_ip,
             FilterData.HOST            : self.__translate_host,
+            FilterData.HOST_ID         : self.__translate_host_id,
             FilterData.PORT            : self.__translate_port,
             FilterData.PROTOCOL        : self.__translate_protocol,
             FilterData.UP              : self.__translate_up,
@@ -66,14 +67,19 @@ class Condition:
             FilterData.COMMENT_HOST    : self.__translate_comment_host,
             FilterData.COMMENT_CRED    : self.__translate_comment_cred,
             FilterData.COMMENT_MISSION : self.__translate_comment_mission,
+            FilterData.MISSION_ID      : self.__translate_mission_id,
             FilterData.MISSION_EXACT   : self.__translate_mission_exact,
             FilterData.MISSION         : self.__translate_mission,
             FilterData.CHECK_ID        : self.__translate_check_id,
             FilterData.CHECK_NAME      : self.__translate_check_name,
-            FilterData.COMMAND_OUTPUT  : self.__translate_command_output,
+            FilterData.COMMAND_OUTPUT    : self.__translate_command_output,
+            FilterData.COMMAND_OUTPUT_ID : self.__translate_command_output_id, 
+            FilterData.VULN_ID         : self.__translate_vuln_id,
             FilterData.VULN            : self.__translate_vuln,
+            FilterData.CREDENTIAL_ID   : self.__translate_credential_id,
             FilterData.OPTION_NAME     : self.__translate_option_name,
             FilterData.OPTION_VALUE    : self.__translate_option_value,
+            FilterData.PRODUCT_ID      : self.__translate_product_id,
             FilterData.PRODUCT_TYPE    : self.__translate_product_type,
             FilterData.PRODUCT_NAME    : self.__translate_product_name,
             FilterData.PRODUCT_VERSION : self.__translate_product_version,
@@ -123,6 +129,11 @@ class Condition:
         LIKE %value%
         """
         return (Host.hostname.ilike('%'+str(value)+'%'))
+
+
+    def __translate_host_id(self, value):
+        """Translate host id into filter"""
+        return (Host.id == int(value))
 
 
     def __translate_port(self, value):
@@ -261,6 +272,11 @@ class Condition:
         return (Mission.comment.ilike('%'+str(value)+'%'))
 
 
+    def __translate_mission_id(self, value):
+        """Translate mission name into exact filter"""
+        return (Mission.id == int(value))
+
+
     def __translate_mission_exact(self, value):
         """Translate mission name into exact filter"""
         return (Mission.name == value)
@@ -286,9 +302,24 @@ class Condition:
         return (CommandOutput.output.ilike('%'+str(value)+'%'))
 
 
+    def __translate_command_output_id(self, value):
+        """Translate command output id into filter"""
+        return (CommandOutput.id == int(value))
+
+
+    def __translate_vuln_id(self, value):
+        """Translate vuln id into filter"""
+        return (Vuln.id == int(value))
+
+
     def __translate_vuln(self, value):
         """Translate vulnerability name into LIKE filter"""
         return (Vuln.name.ilike('%'+str(value)+'%'))
+
+
+    def __translate_credential_id(self, value):
+        """Translate cred id into filter"""
+        return (Credential.id == int(value))
 
 
     def __translate_option_name(self, value):
@@ -304,6 +335,11 @@ class Condition:
     def __translate_product_type(self, value):
         """Translate product type into LIKE filter"""
         return (Product.type.ilike('%'+str(value)+'%'))
+
+
+    def __translate_product_id(self, value):
+        """Translate product id into filter"""
+        return (Product.id == int(value))
 
 
     def __translate_product_name(self, value):

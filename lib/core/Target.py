@@ -17,6 +17,7 @@ from lib.db.Mission import Mission
 from lib.db.Service import Service, Protocol
 from lib.db.Credential import Credential
 from lib.db.Option import Option
+from lib.importer.Config import get_service_name
 from lib.output.Logger import logger
 from lib.output.Output import Output
 from lib.smartmodules.SmartStart import SmartStart
@@ -207,20 +208,20 @@ class Target:
                 return None
 
 
-    def get_product_name_version(self, product_type):
+    def get_products_name_version(self, product_type):
         """
-        Get the product name and version for a given product type.
+        Get list of (product name, product version) for a given product type.
         (e.g for HTTP, for product_type=web_server, it might be product_name=Apache)
 
         :param str product_type: Product type
-        :return: (Product name, version) if present, otherwise (None, None)
-        :rtype: tuple
+        :return: list((Product name, version)) if present
+        :rtype: list((str, str))
         """
-        prod = self.service.get_product(product_type)
-        if prod:
-            return (prod.name, prod.version)
-        else:
-            return (None, None)
+        products = self.service.get_products(product_type)
+        list_name_version = list()
+        for prod in products:
+            list_name_version.append((prod.name, prod.version))
+        return list_name_version
 
 
     def get_usernames_only(self, auth_type=None):
@@ -288,20 +289,26 @@ class Target:
         :param bool smart_context_initialize: Set to True to initialize the context of
             the target using SmartModules, based on information already known
 
-        :return: Availability status (True if up, False otherwise)
-        :rtype: bool
+        :return: Status (True if up, False if any error occur), Reason string
+            Possible reasons:
+                - no-ip
+                - unreachable
+                - unsupported
+                - unspecified-service
+                - ok
+        :rtype: bool, str
         """
 
         # If no IP, means that DNS lookup has failed
         if not self.service.host.ip: 
-            return False
+            return False, 'no-ip'
 
         # Perform reverse DNS lookup if hostname not defined
         # Note: If lookup fails, it fallbacks to IP
         if reverse_dns_lookup:
             if self.service.host.hostname == self.service.host.ip \
-                    or self.service.host.hostname == '' \
-                    or self.service.host.hostname is None:
+                or self.service.host.hostname == '' \
+                or self.service.host.hostname is None:
 
                 logger.info('Reverse DNS lookup for {ip}...'.format(
                     ip=str(self.service.host.ip)))
@@ -312,19 +319,20 @@ class Target:
         if availability_check and self.service.name != 'http':
             logger.info('Check if service is reachable...')
             self.__availability_check()
-
-        # For HTTP, also grab HTML title and HTTP response headers 
-        elif (html_title_grabbing or availability_check) \
-            and self.service.name == 'http':
-            
+        
+        elif (html_title_grabbing or availability_check) and self.service.name == 'http':
+            # For HTTP, also grab HTML title and HTTP response headers 
             logger.info('Check if URL is reachable (grab HTTP response)...')
             self.__grab_html_title_and_headers()
+        
         else:
             self.service.up = True
 
+
         # If service not reachable, we can stop here
         if not self.service.up:
-            return False
+            return False, 'unreachable'
+
 
         # Run Nmap against service for banner grabbing, OS info, Device info
         # Only for TCP services, and if no banner already stored in database
@@ -337,6 +345,49 @@ class Target:
                 service=self))
             self.__run_nmap()
 
+
+        # In case service name is not specified, deduce it from Nmap results
+        # or if not available, from default port
+        if not self.service.name:
+            if self.service.name_original:
+                name = get_service_name(self.service.name_original)
+                logger.info('Detected service is: {service}'.format(service=name)) 
+                if not self.services_config.is_service_supported(name, multi=False):
+                    return False, 'unsupported'   
+            else:
+                name = self.services_config.get_service_from_port(
+                    self.service.port,
+                    {Protocol.TCP: 'tcp', Protocol.UDP: 'udp'}.get(self.service.protocol))
+                if name:
+                    logger.info('Service name not specified, default service for ' \
+                        'port {port}/{proto} = {service} is assumed'.format(
+                            port=self.service.port,
+                            proto={Protocol.TCP: 'tcp', Protocol.UDP: 'udp'}.get(
+                                self.service.protocol),
+                            service=name))
+                else:
+                    return False, 'unspecified-service'
+
+            self.service.name = name
+
+            # Some additionial processing required if detected service is HTTP here
+            if self.service.name == 'http':
+                if self.get_specific_option_value('https'):
+                    proto = 'https'
+                else:
+                    proto = 'http'
+
+                # By default, forge URL with hostname
+                self.service.url = '{proto}://{ip}:{port}'.format(
+                    proto=proto, ip=self.service.host.hostname, port=self.service.port)
+
+
+                if html_title_grabbing:
+                    # For HTTP, also grab HTML title and HTTP response headers 
+                    logger.info('Check if URL is reachable (grab HTTP response)...')
+                    self.__grab_html_title_and_headers()
+
+
         # Perform Web technologies detection for HTTP, if no technologies
         # are already stored in database
         if web_technos_detection \
@@ -348,20 +399,7 @@ class Target:
             technos = detector.detect()
             self.service.web_technos = str(technos)
             detector.print_technos()
-            
-            # # Try to deduce OS from detected web technologies
-            # if not self.service.host.os:
-            #     detected_os = detector.get_os()
-            #     if detected_os:
-            #         self.service.host.os = detected_os
-            #         self.service.host.os_vendor = OSUtils.get_os_vendor(detected_os)
-            #         self.service.host.os_family = OSUtils.get_os_family(detected_os)
-            #         self.service.host.type = OSUtils.get_device_type(
-            #             self.service.host.os,
-            #             self.service.host.os_family,
-            #             '')
-            #         logger.info('Detected OS from web technologies = {os}'.format(
-            #             os=detected_os))
+
 
         # Run SmartModules Start to initialize the context of the target based on the
         # information already known (i.e. banner, web technologies...)
@@ -369,7 +407,7 @@ class Target:
             start = SmartStart(self.service)
             start.run()
 
-        return self.service.up
+        return self.service.up, 'ok' if self.service.up else 'unreachable'
 
 
     def __reverse_dns_lookup(self):

@@ -95,22 +95,50 @@ class ResultsRequester(Requester):
 
     #------------------------------------------------------------------------------------
 
-    def add_result(self, service_id, check, category, command_outputs):
+    def add_result(self, 
+                   service_id, 
+                   check, 
+                   category, 
+                   tool_used,
+                   command_outputs,
+                   start_time,
+                   end_time,
+                   duration):
         """
         Add new result for given service.
         :param int service_id: Id of service
         :param str check: Name of the check to add
         :param str category: Category of the check
-        :param str command_output: Command output text
+        :param str tool_used: Name of the tool used for the check
+        :param list(CommandOutput) command_outputs: List of command outputs for the
+            check to add (there might be several commands run for a single check)
+        :param datetime.datetime start_time: Check start time
+        :param datetime.datetime end_time: Check end time
+        :param int duration: Duration of the checks (in seconds)
         """
         matching_check = self.sqlsess.query(Result).filter_by(service_id = service_id)\
                                      .filter(Result.check == check).first()
+        ret = None
         if matching_check:
             for output in command_outputs:
                 matching_check.command_outputs.append(output)
+            # Update start_time/end_time/duration with the values for the new check
+            matching_check.start_time = start_time
+            matching_check.end_time = end_time
+            matching_check.duration = duration
+            ret = matching_check
         else:
-            result = Result(category=category, check=check, service_id=service_id)
+            result = Result(
+                category=category, 
+                check=check, 
+                tool_used=tool_used,
+                start_time=start_time,
+                end_time=end_time,
+                duration=duration,
+                service_id=service_id)
             result.command_outputs = command_outputs
             self.sqlsess.add(result)
+            ret = result
 
         self.sqlsess.commit()
+        return ret

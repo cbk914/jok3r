@@ -15,6 +15,7 @@ from lib.db.Screenshot import Screenshot
 from lib.db.Service import Service
 from lib.db.Vuln import Vuln
 from lib.utils.StringUtils import StringUtils
+from lib.requester.JobsRequester import JobsRequester
 from lib.output.Logger import logger
 from lib.output.Output import Output
 
@@ -67,35 +68,55 @@ class MissionsRequester(Requester):
 
     #------------------------------------------------------------------------------------
 
-    def add(self, name):
+    def add(self, name, comment=''):
         """
         Add new mission.
         :param str name: Name of the mission to add
+        :return: Newly created mission
+        :rtype: Mission|None
         """
         mission = self.sqlsess.query(Mission).filter(Mission.name == name).first()
         if mission:
             logger.warning('A mission named "{name}" already exists'.format(
                 name=mission.name))
-            return False
+            return None
         else:
-            self.sqlsess.add(Mission(name=name))
+            new_mission = Mission(name=name, comment=comment)
+            self.sqlsess.add(new_mission)
             self.sqlsess.commit()
             logger.success('Mission "{name}" successfully added'.format(name=name))
-            return True
+            return new_mission
 
 
     #------------------------------------------------------------------------------------
 
     def delete(self):
-        """Delete selected missions in database"""
-        results = self.get_results()
-        if not results:
+        """
+        Delete selected mission in database
+        :return: Status
+        :rtype: bool
+        """
+        result = self.get_first_result()
+        if not result:
             logger.error('No mission with this name')
+            return False
         else:
-            for r in results:
-                self.sqlsess.delete(r)
-            self.sqlsess.commit()
-            logger.success('Mission deleted')
+            # Mission cannot be deleted if it has one (or more) queued/running
+            # jobs currently targeting one of its service
+            jobs_req = JobsRequester(self.sqlsess)
+            if jobs_req.is_mission_with_queued_or_running_jobs(result.id):
+                logger.error('Mission {name} cannot be deleted because ' \
+                    'there is a queued or running job currently targeting ' \
+                    'it'.format(
+                        name=result.name
+                    )
+                )
+                return False
+            else:
+                self.sqlsess.delete(result)
+                self.sqlsess.commit()
+                logger.success('Mission deleted')
+                return True
 
 
     def reset(self):
@@ -121,9 +142,15 @@ class MissionsRequester(Requester):
         Rename selected missions.
         :param str old: Name of the mission to rename
         :param str new: New mission name
+        :return: Status
+        :rtype: bool
         """
         if old == 'default':
             logger.warning('Default mission cannot be renamed')
+            return False
+
+        if not new:
+            logger.warning('New mission name cannot be empty')
             return False
 
         mission = self.sqlsess.query(Mission).filter(Mission.name == old).first()
@@ -146,12 +173,16 @@ class MissionsRequester(Requester):
         """
         Edit comment of selected missions.
         :param str comment: New comment
+        :return: Status
+        :rtype: bool
         """
         results = self.get_results()
         if not results:
             logger.error('No mission with this name')
+            return False
         else:
             for r in results:
                 r.comment = comment
             self.sqlsess.commit()
             logger.success('Comment edited')
+            return True

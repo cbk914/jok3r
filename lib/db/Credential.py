@@ -7,7 +7,7 @@ from sqlalchemy import ForeignKey, Column, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_method
 
-from lib.db.Session import Base
+from lib.db.Base import Base
 
 
 class Credential(Base):
@@ -19,9 +19,11 @@ class Credential(Base):
     # Password can be NULL when only username is set/known
     password   = Column(String(255), nullable=True) 
     comment    = Column(Text, nullable=False, default='')
+    command_output_id = Column(Integer, ForeignKey('command_outputs.id'))
     service_id = Column(Integer, ForeignKey('services.id'))
 
-    service    = relationship('Service', back_populates='credentials')
+    command_output = relationship('CommandOutput', back_populates='credentials')
+    service = relationship('Service', back_populates='credentials')
 
 
     #------------------------------------------------------------------------------------
@@ -36,6 +38,7 @@ class Credential(Base):
             username=self.username,
             password=self.password,
             comment=self.comment,
+            command_output_id=None,
             service_id=None)
 
 

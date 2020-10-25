@@ -8,6 +8,8 @@ from lib.utils.StringUtils import StringUtils
 from lib.db.Host import Host
 from lib.db.Mission import Mission
 from lib.db.Service import Service, Protocol
+from lib.requester.JobsRequester import JobsRequester
+from lib.screenshoter.ScreenshotsProcessor import ScreenshotsProcessor
 from lib.output.Logger import logger
 from lib.output.Output import Output
 
@@ -55,7 +57,7 @@ class HostsRequester(Requester):
 
     #------------------------------------------------------------------------------------
     
-    def add_or_merge_host(self, host):
+    def add_or_merge_host(self, host, take_screenshot=True):
         """
         Add/merge new host into the current mission scope in database.
         :param Host host: Host to add (or merge with matching existing one)
@@ -88,6 +90,14 @@ class HostsRequester(Requester):
                     service.host = match_host
                     self.sqlsess.add(service)
 
+                    if service.name == 'http' and take_screenshot:
+                        processor = ScreenshotsProcessor(
+                            self.current_mission, 
+                            self.sqlsess
+                        )
+                        if processor is not None:
+                            processor.take_screenshot(service)
+
                 logger.success('{action} service: host {ip} | port {port}/{proto} | ' \
                     'service {service}'.format(
                     action  = 'Updated' if match_service else 'Added',
@@ -117,6 +127,13 @@ class HostsRequester(Requester):
                     proto   = { Protocol.TCP: 'tcp', Protocol.UDP: 'udp' }.get(
                         service.protocol),
                     service = service.name))
+                if service.name == 'http' and take_screenshot:
+                    processor = ScreenshotsProcessor(
+                        self.current_mission, 
+                        self.sqlsess
+                    )
+                    if processor is not None:
+                        processor.take_screenshot(service)
 
         self.sqlsess.commit()
 
@@ -127,24 +144,46 @@ class HostsRequester(Requester):
         """
         Edit comment of selected hosts.
         :param str comment: New comment
+        :return: Status
+        :rtype: bool
         """
         results = self.get_results()
         if not results:
             logger.error('No matching host')
+            return False
         else:
             for r in results:
                 r.comment = comment
             self.sqlsess.commit()
             logger.success('Comment edited')
+            return True
 
 
     def delete(self):
-        """Delete selected hosts"""
+        """
+        Delete selected hosts
+        :return: Status
+        :rtype: bool
+        """
         results = self.get_results()
         if not results:
             logger.error('No matching host')
+            return False
         else:
+            jobs_req = JobsRequester(self.sqlsess)
             for r in results:
+                # Host cannot be deleted if it has one (or more) queued/running
+                # jobs currently targeting one of its service
+                if jobs_req.is_host_with_queued_or_running_jobs(r.id):
+                    logger.error('Host {ip} {hostname} cannot be deleted because ' \
+                        'there is a queued or running job currently targeting ' \
+                        'it'.format(
+                            ip=r.ip, 
+                            hostname='('+r.hostname+')' if r.hostname else '', 
+                        )
+                    )
+                    continue
+
                 logger.info('Host {ip} {hostname} (and its {nb_services} services) ' \
                     'deleted'.format(
                     ip=r.ip, 
@@ -153,6 +192,7 @@ class HostsRequester(Requester):
                 self.sqlsess.delete(r)
 
             self.sqlsess.commit()
+            return True
 
 
     #------------------------------------------------------------------------------------
