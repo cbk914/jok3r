@@ -108,8 +108,8 @@ VIRTUALENVS_DIR    = TOOL_BASEPATH + '/toolbox/virtualenvs'
 #----------------------------------------------------------------------------------------
 # Database Settings
 
-#DB_STRING = 'sqlite:///' + TOOL_BASEPATH + '/local.db' # sqlite
-DB_STRING = 'postgres://admin:password@localhost:5432/postgres' # postgres
+DB_STRING = 'sqlite:///' + TOOL_BASEPATH + '/local.db' # sqlite
+#DB_STRING = 'postgres://admin:password@localhost:5432/postgres' # postgres
 
 #----------------------------------------------------------------------------------------
 # Display Settings
