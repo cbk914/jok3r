@@ -1,6 +1,10 @@
 =========
 Changelog
 =========
+**V3.0 BETA 3 Arkham Subversion ** 2020-12-11
+	*RPC service fixes
+	
+
 **v3.0 BETA 3 Arkham Subversion** 2020-07-21
 	*Add RPC service and tool (disabled by default)
 	*Add initial scheme for F5 BIG IP vulnerability scanner and exploiter

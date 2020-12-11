@@ -121,6 +121,14 @@ SERVICES TO ADD
 * RLOGIN
 * RSH
 * IMAP
+* KERBEROS5
+
+PROFILES TO ADD
+================================================================
+* MIKROTIK
+* AVAYA
+* CITRIX
+
 
 Dorking capabilities (Google, shodan, Bing, Censys...)
 #########################################################################################
