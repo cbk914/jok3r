@@ -5,7 +5,7 @@ bs4
 cmd2>=0.9.1
 colorama
 colored
-colorlog>=3.1.4
+colorlog>=6.10.1
 enlighten>=1.0.7
 eventlet
 flask
