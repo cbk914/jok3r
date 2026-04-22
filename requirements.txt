@@ -1,6 +1,6 @@
 ansi2html>=1.5.2
 argparse
-blessed>=1.15.0
+blessed>=1.38.0
 bs4
 cmd2>=0.9.1
 colorama
